@@ -106,19 +106,16 @@ def enroll(request, course_id):
 def submit(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     user = request.user
-    is_enrolled = check_if_enrolled(user, course)
-    if is_enrolled and user.is_authenticated:
-        choices = extract_answers(request)
-        enroll = Enrollment.objects.filter(user=user, course=course).get()
 
-        submission = Submission.objects.create(enrollment_id = enroll.id)
-        for choice in choices:
-            c = Choice.objects.filter(id = int(choice)).get()
-            submission.choices.add(c)
-        submission.save()
-        return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(course.id, submission.id)))
+    choices = extract_answers(request)
 
-    return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id, submission.id)))
+    enroll = Enrollment.objects.filter(user=user, course=course).get()
+    submission = Submission.objects.create(enrollment_id = enroll.id)
+    for choice in choices:
+        c = Choice.objects.filter(id = int(choice)).get()
+        submission.chocies.add(c)
+    submission.save()
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(course.id, submission.id)))
 
 def extract_answers(request):
    submitted_anwsers = []
@@ -136,20 +133,27 @@ def extract_answers(request):
         # Get the selected choice ids from the submission record
         # For each selected choice, check if it is a correct answer or not
         # Calculate the total score
+
 def show_exam_result(request, course_id, submission_id):
     context = {}
     course = Course.objects.get(id = course_id)
-    submit = Submission.objects.get(id = submission_id)
-    selected = Submission.objects.get(id = submission_id).values_list('choices', flat = True)
-    grade = 0
-    for i in submit.choices.all().filter(is_correct=True).values_list('question_id'):
-        grade += Question.objects.filter(id=i[0]).first().grade   
-    context['selected'] = selected
+
+    submission = Submission.objects.get(id = submission_id)
+    choices = submission.chocies.all()
+    score = 0
+    wrong = 0
+    for i in choices:
+        if i.is_correct:
+            score += i.question_id.grade
+        else:
+            wrong += i.question_id.grade
+    
+    grade = round(100*(score - wrong)/(score + wrong), 2)
+
+    if(grade < 0):
+        grade = 0
+    context['choices'] = choices
     context['grade'] = grade
     context['course'] = course
+    print(choices)
     return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
-
-
-
-
-
